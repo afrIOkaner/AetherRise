@@ -1,12 +1,27 @@
 /**
  * @file ai-engine.ts
- * @description High-availability AI Orchestrator with Multi-key Failover and Chapter logic.
- * Updated for AetherRise Goal 1-13: Multi-tier failover and Multi-key Gemini rotation.
+ * @description Core orchestration engine for Aether AI with self-healing capabilities and multi-tier failover.
  */
 
 import axios from 'axios';
-import { pushToAetherStorage, AetherPushParams } from '../services/github-storage';
-import { sanitizeAIContent } from './sanitizer'; // Imported as per our goal
+import { pushToAetherStorage } from '../services/github-storage';
+import { sanitizeAIContent } from './sanitizer'; 
+import { AETHER_CONFIG } from './business-config';
+
+/**
+ * @interface EngineParams
+ * Configuration for the AI generation request.
+ */
+export interface EngineParams {
+  prompt: string;
+  userId: string;
+  userRole: "student" | "teacher" | "business" | "general" | "guest"; 
+  sessionID?: string;
+  university?: string;
+  department?: string;
+  preferredLanguage?: "Bengali" | "English";
+  syncToGithub?: boolean;
+}
 
 export interface AIResult {
   content: string;
@@ -14,31 +29,21 @@ export interface AIResult {
   githubUrl?: string;
 }
 
-interface GeminiPayload {
-  contents: Array<{
-    parts: Array<{
-      text?: string;
-      inlineData?: {
-        mimeType: string;
-        data: string;
-      };
-    }>;
-  }>;
-}
+/**
+ * @constant HEALTH_STATUS
+ * Tracks API health and blacklists failed keys to ensure high availability.
+ */
+const HEALTH_STATUS = {
+  blacklistedKeys: new Set<number>(),
+  isGroqDown: false,
+  isHFDown: false,
+  lastHealCycle: Date.now()
+};
 
-interface EngineParams {
-  prompt: string;
-  image?: string; 
-  userRole: AetherPushParams["userRole"];
-  studentLevel?: AetherPushParams["studentLevel"];
-  userId: string;
-  sessionID: string;
-  syncToGithub?: boolean;
-  preferredLanguage?: "Bengali" | "English";
-  isChapterMode?: boolean; // New: To trigger chapter notes
-}
-
-// --- Multi-key Setup for Gemini (Goal: Quota Resilience) ---
+/**
+ * @constant GEMINI_KEYS
+ * Array of rotated API keys for load balancing and rate-limit mitigation.
+ */
 const GEMINI_KEYS = [
   process.env.NEXT_PUBLIC_GEMINI_KEY_1 || "",
   process.env.NEXT_PUBLIC_GEMINI_KEY_2 || "",
@@ -49,102 +54,95 @@ const GEMINI_KEYS = [
 
 let currentKeyIndex = 0;
 
+/**
+ * Main entry point for the AI engine. Executes primary model and falls back to secondary if necessary.
+ */
 export async function runAetherEngine(params: EngineParams): Promise<AIResult> {
-  const { prompt, image, userRole, studentLevel, preferredLanguage = "Bengali", isChapterMode } = params;
+  const { prompt, university, department, preferredLanguage = "Bengali" } = params;
 
-  const roleContext = userRole.toUpperCase();
-  const levelContext = studentLevel ? `(Academic Level: ${studentLevel})` : "";
-  
-  const languageInstruction = preferredLanguage === "Bengali" 
-    ? "Explanations in Bengali, but all technical terms and math MUST remain in English."
-    : "Respond strictly in Professional English.";
+  // Self-healing: Reset health nodes every 10 minutes
+  if (Date.now() - HEALTH_STATUS.lastHealCycle > 600000) {
+    HEALTH_STATUS.blacklistedKeys.clear();
+    HEALTH_STATUS.isGroqDown = false;
+    HEALTH_STATUS.lastHealCycle = Date.now();
+  }
 
-  // Goal: Persona & Mode Detection
-  const modeInstruction = isChapterMode 
-    ? "MODE: CHAPTER NOTE. Provide deep, structured academic explanations with multiple sections."
-    : "MODE: QUICK CHAT. Provide concise yet accurate information.";
+  // Constructing System Instructions for Institutional Branding
+  const instName = university || AETHER_CONFIG.BRAND.INSTITUTION;
+  const deptName = department || AETHER_CONFIG.BRAND.DEPARTMENT;
+  const SYSTEM_CONTEXT = `[ROLE]: Expert at ${instName}, ${deptName}. Use LaTeX ($ for inline, $$ for block). Language: ${preferredLanguage}.`;
 
-  const SYSTEM_CONTEXT = `[SYSTEM_ROLE]: Senior ${roleContext} Expert ${levelContext}.
-  [BRAND]: AetherRise.
-  [FORMATTING]: Use Markdown headers. Use LaTeX for math ($$ for block, $ for inline).
-  [LANGUAGE]: ${languageInstruction}
-  [INSTRUCTION]: ${modeInstruction}
-  [SAFEGUARD]: No backticks in plain text.`;
-
-  const fullPrompt = `${SYSTEM_CONTEXT}\n\n[USER_REQUEST]: ${prompt}`;
-
-  // --- Tier 1: Gemini (Multi-key Rotation) ---
-  try {
-    const activeKey = GEMINI_KEYS[currentKeyIndex];
-    currentKeyIndex = (currentKeyIndex + 1) % GEMINI_KEYS.length; // Rotate for next call
-
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${activeKey}`;
+  // Tier 1: Gemini Key Rotation Strategy
+  for (let i = 0; i < GEMINI_KEYS.length; i++) {
+    const slotIndex = (currentKeyIndex + i) % GEMINI_KEYS.length;
     
-    const geminiPayload: GeminiPayload = {
-      contents: [{ parts: [{ text: fullPrompt }] }]
-    };
+    // Skip if the current key is blacklisted due to recent failure
+    if (HEALTH_STATUS.blacklistedKeys.has(slotIndex)) continue;
 
-    if (image) {
-      geminiPayload.contents[0].parts.push({
-        inlineData: { mimeType: "image/jpeg", data: image }
-      });
-    }
-
-    const res = await axios.post(geminiUrl, geminiPayload, { timeout: 15000 });
-    let content = res.data.candidates[0].content.parts[0].text;
-    
-    // Sanitize output for build safety
-    content = sanitizeAIContent(content);
-    
-    return await finalize(content, `Gemini (Key Slot ${currentKeyIndex + 1})`, params);
-
-  } catch (error: any) {
-    console.warn("[TIER_1_FAILED]: Gemini rotation failed, trying Tier 2 (Groq).");
-
-    // --- Tier 2: Groq (Secondary Fallback) ---
     try {
-      const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', 
-        { 
-          model: "llama-3.3-70b-versatile", 
-          messages: [
-            { role: "system", content: SYSTEM_CONTEXT },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.5 
-        },
+      const res = await axios.post(
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEYS[slotIndex]}`,
+        { contents: [{ parts: [{ text: `${SYSTEM_CONTEXT}\n\n${prompt}` }] }] },
+        { timeout: 15000 }
+      );
+      
+      // Update key index for the next request cycle
+      currentKeyIndex = (slotIndex + 1) % GEMINI_KEYS.length;
+      
+      // Sanitize and Finalize Output
+      return await finalize(res.data.candidates[0].content.parts[0].text, `Gemini (Slot ${slotIndex + 1})`, params);
+    } catch (err) {
+      // Blacklist key and proceed to next available slot
+      HEALTH_STATUS.blacklistedKeys.add(slotIndex);
+    }
+  }
+
+  // Tier 2: Groq Fallback Protocol
+  if (!HEALTH_STATUS.isGroqDown && process.env.GROQ_API_KEY) {
+    try {
+      const groqRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', 
+        { model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }] },
         { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` }, timeout: 10000 }
       );
-      return await finalize(sanitizeAIContent(res.data.choices[0].message.content), "Groq (Fallback)", params);
-
-    } catch (groqError: any) {
-      // --- Final Resilience: Error Message ---
-      return { 
-        content: "AetherRise Engine is currently optimizing. Please retry in a few seconds.", 
-        provider: "Resilience Guard" 
-      };
+      return await finalize(groqRes.data.choices[0].message.content, "Groq (Resilience)", params);
+    } catch (e) {
+      HEALTH_STATUS.isGroqDown = true;
     }
   }
+
+  return { content: "Neural Grid Busy. Please synchronize again in 30 seconds.", provider: "Core Guard" };
 }
 
+/**
+ * Finalizes content by sanitizing and pushing to storage if required.
+ * Targets the 'aether_notes' database structure.
+ */
 async function finalize(content: string, provider: string, p: EngineParams): Promise<AIResult> {
   let githubUrl: string | undefined;
+  
+  // Sanitize AI content to remove markdown debris and formatting errors
+  const sanitized = sanitizeAIContent(content);
 
-  if (p.syncToGithub) {
+  // Persistence Logic: Push to GitHub if sync is enabled and user is authenticated
+  if (p.syncToGithub && p.userId && p.userId !== "anonymous") {
     try {
       const syncResult = await pushToAetherStorage({
-        fileName: `AetherNote-${Date.now()}.md`,
-        content,
-        userRole: p.userRole,
-        studentLevel: p.studentLevel,
+        fileName: `Aether-${Date.now()}.md`,
+        content: sanitized,
+        userRole: p.userRole, 
         userId: p.userId,
-        sessionID: p.sessionID,
-        folder: "notes"
+        sessionID: p.sessionID || "default-session",
+        folder: "notes" // Aligned with 'aether_notes' database logic
       });
       githubUrl = syncResult.url;
-    } catch (error) {
-      console.error("[GITHUB_SYNC_ERROR]:", error);
+    } catch (e) { 
+      console.error("[VAULT_ERROR]: GitHub synchronization failed."); 
     }
   }
-
-  return { content, provider, githubUrl };
+  
+  return { 
+    content: sanitized, 
+    provider, 
+    githubUrl // This URL will be persisted in the 'aether_notes' table
+  };
 }

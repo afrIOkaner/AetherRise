@@ -1,38 +1,79 @@
 /**
  * @file business-config.ts
- * @description Centralized configuration for AetherRise. 
- * Use this to control branding, payment numbers, and dynamic limits.
+ * @description Centralized business logic, branding, and payment configuration.
+ * Tailored for Begum Rokeya University, Rangpur.
  */
 
 export const AETHER_CONFIG = {
   // Brand Identity
-  BRAND_NAME: "AetherRise",
-  
-  // Payment Gateway Information (Replace with your actual numbers)
-  PAYMENT_METHODS: {
-    bkash: {
-      number: "01718843589", // Your Bkash Number
-      type: "Send Money"
-    },
-    rocket: {
-      number: "01718843589", // Your Rocket Number
-      type: "Send Money"
-    },
-    nagad: {
-      number: "01718843589", // Your Nagad Number
-      type: "Send Money"
-    }
+  BRAND: {
+    NAME: "AetherRise",
+    FULL_NAME: "AetherRise AI Core",
+    SLOGAN: "Advanced AI Academic Assistant",
+    INSTITUTION: "Begum Rokeya University, Rangpur",
+    DEPARTMENT: "Statistics",
+    TAGLINE: "Precision Analytics for Modern Statisticians",
   },
 
-  // Subscription Details
+  // Database & Storage Mapping (Added for consistency)
+  STORAGE: {
+    TABLE_NAME: "aether_notes",
+    VAULT_FOLDER: "notes",
+  },
+
+  // Payment Gateway Information
+  PAYMENT_GATEWAY: {
+    METHODS: {
+      bkash: {
+        id: "bkash",
+        name: "bKash",
+        number: "01718843589",
+        type: "Personal (Send Money)",
+        color: "#E3106E",
+      },
+      nagad: {
+        id: "nagad",
+        name: "Nagad",
+        number: "01718843589",
+        type: "Personal (Send Money)",
+        color: "#F7941D",
+      },
+      rocket: {
+        id: "rocket",
+        name: "Rocket",
+        number: "01718843589",
+        type: "Personal (Send Money)",
+        color: "#8C3494",
+      },
+    },
+    INSTRUCTIONS: "Please send the exact amount and provide the transaction ID in the next step.",
+  },
+
+  // Pricing Strategy
   PRICING: {
-    premium_bdt: 500,
-    original_price: 500,
+    CURRENCY: "BDT",
+    PREMIUM_SALE_PRICE: 149,
+    ORIGINAL_PRICE: 500,
+    DISCOUNT_PERCENTAGE: "70%",
+    SALE_TAGLINE: "BRUR Student Special Offer",
+    ACCESS_DURATION: "Lifetime Access",
   },
 
-  // Dynamic Usage Limits (For Free Tier)
+  // Dynamic Usage Limits
   LIMITS: {
     FREE_NOTES_PER_DAY: 5,
-    FREE_IMAGES_PER_DAY: 5
+    FREE_IMAGES_PER_DAY: 5,
+    PRO_NOTES_PER_DAY: 1000, // Increased for Pro users
+    PRO_IMAGES_PER_DAY: 100,
+  },
+
+  // SEO & PWA Metadata
+  METADATA: {
+    TITLE: "AetherRise | BRUR Statistics AI Core",
+    DESCRIPTION: "The ultimate AI assistant for Statistics students at Begum Rokeya University, Rangpur.",
+    THEME_COLOR: "#2563eb",
+    BACKGROUND_COLOR: "#ffffff",
   }
 };
+
+export type AetherConfig = typeof AETHER_CONFIG;
