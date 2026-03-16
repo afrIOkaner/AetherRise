@@ -18,6 +18,7 @@
         "logomark",
         "mixtral",
         "nagad",
+        "Ollama",
         "pading",
         "pathing",
         "precaching",
@@ -29,6 +30,7 @@
         "serwist",
         "sess",
         "supabase",
-        "vercel"
+        "vercel",
+        "Zotero"
     ]
 }
