@@ -2,24 +2,24 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-/** * @description Import Sidebar and SW components from the root components folder 
+/**
+ * @description Import core providers and layout components
  */
-import Sidebar from "@/components/Sidebar"; 
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import { AuthProvider } from "@/context/AuthContext"; 
 import { AETHER_CONFIG } from "@/lib/business-config";
+import ClientLayout from "@/components/ClientLayout"; 
 
 const inter = Inter({ subsets: ["latin"] });
 
 /**
- * @description Global Metadata - Updated with your specific icon filenames
+ * @description Global SEO Metadata - Configured for PWA and Social Sharing
  */
 export const metadata: Metadata = {
   title: AETHER_CONFIG.METADATA.TITLE,
   description: AETHER_CONFIG.METADATA.DESCRIPTION,
   manifest: "/manifest.json",
   icons: {
-    // Matches your filename: icon-512x512.png
     apple: "/icon-512x512.png", 
     icon: "/icon-192x192.png",
   },
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * @description Viewport settings for a native PWA feel on mobile devices
+ * @description Viewport settings to ensure native mobile feel (Disable user scaling)
  */
 export const viewport: Viewport = {
   width: "device-width",
@@ -50,20 +50,13 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          {/* Background logic for PWA Service Worker */}
+          {/* Handles PWA Service Worker background registration */}
           <ServiceWorkerRegistration />
 
-          <div className="flex min-h-screen bg-gray-50">
-            {/* Navigation Sidebar */}
-            <Sidebar />
-
-            {/* Main content area: ml-72 ensures it stays to the right of the sidebar */}
-            <main className="flex-1 ml-72 min-h-screen relative overflow-x-hidden">
-              <div className="p-4 md:p-8 lg:p-12">
-                {children}
-              </div>
-            </main>
-          </div>
+          {/* ClientLayout manages conditional sidebar rendering based on routes */}
+          <ClientLayout>
+            {children}
+          </ClientLayout>
         </AuthProvider>
       </body>
     </html>
