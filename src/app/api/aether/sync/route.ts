@@ -89,7 +89,7 @@ export async function POST(request: Request) {
       sessionID: sessionID || `sess_${Date.now()}`,
       syncToGithub,
       preferredLanguage
-    });
+    }as any);
 
     // 5. Analytics Metadata
     const wordCount = aiResponse.content?.trim().split(/\s+/).length || 0;

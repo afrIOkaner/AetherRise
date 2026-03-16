@@ -7,7 +7,7 @@
 "use client";
 import React, { useState } from 'react';
 import { AETHER_CONFIG } from '@/lib/business-config';
-import { CheckCircle, Zap, ShieldCheck } from 'lucide-react';
+import { Zap, ShieldCheck } from 'lucide-react';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -102,10 +102,10 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
           <div className="bg-blue-600 p-5 rounded-3xl mb-6 shadow-xl shadow-blue-100 text-white relative overflow-hidden">
              <div className="relative z-10">
                 <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-1">
-                   {AETHER_CONFIG.PAYMENT_METHODS[paymentMethod].type} Personal Number
+                   {AETHER_CONFIG.PAYMENT_GATEWAY.METHODS[paymentMethod].type} Personal Number
                 </p>
                 <p className="text-2xl font-mono font-black tracking-widest">
-                  {AETHER_CONFIG.PAYMENT_METHODS[paymentMethod].number}
+                  {AETHER_CONFIG.PAYMENT_GATEWAY.METHODS[paymentMethod].number}
                 </p>
                 <div className="flex items-center gap-1 mt-3 opacity-90 text-[10px] font-bold">
                   <ShieldCheck size={12} /> Encrypted Verification

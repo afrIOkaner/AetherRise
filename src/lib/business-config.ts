@@ -75,5 +75,6 @@ export const AETHER_CONFIG = {
     BACKGROUND_COLOR: "#ffffff",
   }
 };
-
+// Alias for backward compatibility with upgradeModal.tsx
+export const PAYMENT_METHODS = AETHER_CONFIG.PAYMENT_GATEWAY.METHODS;
 export type AetherConfig = typeof AETHER_CONFIG;
