@@ -43,7 +43,6 @@ interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
 }
 
-// Interface to resolve window.SpeechRecognition types without using 'any'
 interface SpeechWindow extends Window {
   SpeechRecognition?: new () => ISpeechRecognition;
   webkitSpeechRecognition?: new () => ISpeechRecognition;
@@ -121,7 +120,6 @@ export default function AetherDashboard() {
   };
 
   const handleVoiceInput = () => {
-    // Cast window to custom SpeechWindow interface to bypass 'any' linter rules
     const speechWin = window as unknown as SpeechWindow;
     const RecognitionConstructor = speechWin.SpeechRecognition || speechWin.webkitSpeechRecognition;
 
@@ -141,7 +139,7 @@ export default function AetherDashboard() {
 
     recognition.start();
   };
-<p className="text-gray-500 mb-8">Precision Analytics for Modern Science</p>
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isOffline) return;
@@ -185,6 +183,7 @@ export default function AetherDashboard() {
     );
   }
 
+  // --- Login UI (User not logged in) ---
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#fcfcfc] p-6 text-center">
@@ -192,7 +191,9 @@ export default function AetherDashboard() {
           <Cpu size={48} />
         </div>
         <h1 className="text-4xl font-black text-gray-900 mb-2">{AETHER_CONFIG.BRAND.NAME}</h1>
-        <p className="text-gray-500 mb-8">{AETHER_CONFIG.BRAND.TAGLINE}</p>
+        
+        <p className="text-gray-500 mb-8">Precision Analytics for Modern Science</p>
+        
         <button 
           onClick={handleGoogleLogin}
           className="flex items-center gap-3 px-8 py-4 bg-white border border-gray-200 rounded-2xl font-bold hover:bg-gray-50 transition-all text-gray-700"
@@ -204,6 +205,7 @@ export default function AetherDashboard() {
     );
   }
 
+  // --- Dashboard UI (Logged in) ---
   return (
     <div className="relative min-h-screen bg-[#fcfcfc]">
       {showOnboarding && (

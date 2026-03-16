@@ -1,6 +1,6 @@
 {
-    "id": "com.aetherrise.aicore",
-    "name": "AetherRise AI Core",
+    "id": "com.aetherrise.auracore",
+    "name": "AetherRise Aura Core",
     "short_name": "AetherRise",
     "description": "Enterprise-grade AI Orchestrator for Engineering and Statistics.",
     "start_url": "/?source=pwa",
