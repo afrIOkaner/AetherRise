@@ -35,6 +35,21 @@
             "purpose": "maskable"
         }
     ],
+    "screenshots": [{
+            "src": "/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "AetherRise Desktop"
+        },
+        {
+            "src": "/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "AetherRise Mobile"
+        }
+    ],
     "shortcuts": [{
         "name": "Open Vault",
         "short_name": "Vault",
