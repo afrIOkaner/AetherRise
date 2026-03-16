@@ -1,3 +1,5 @@
+"use client";
+
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -10,8 +12,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   profile: any | null;
-  signOut: () => Promise<void>; // Existing method
-  logout: () => Promise<void>;  // Added to match Sidebar usage
+  signOut: () => Promise<void>; 
+  logout: () => Promise<void>;  
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,7 +25,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Initial authentication check on component mount
     const initializeAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
@@ -34,7 +35,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     initializeAuth();
 
-    // Listener for real-time authentication state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       const currentUser = session?.user ?? null;
@@ -51,9 +51,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  /**
-   * @description Fetches the user profile from the database
-   */
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
@@ -64,9 +61,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!error && data) setProfile(data);
   };
 
-  /**
-   * @description Syncs or creates a new profile for the user
-   */
   const syncProfile = async (authUser: User) => {
     const { data, error } = await supabase
       .from('profiles')
@@ -74,7 +68,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .eq('id', authUser.id)
       .single();
 
-    // Auto-create profile if it doesn't exist
     if (error || !data) {
       const { data: newProfile, error: insertError } = await supabase
         .from('profiles')
@@ -95,16 +88,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * @description Centralized sign out method
-   */
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
-  /**
-   * @description Alias for signOut to maintain compatibility with Sidebar
-   */
   const logout = signOut;
 
   return (
