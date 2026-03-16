@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -9,17 +9,11 @@ import { QRCodeCanvas } from 'qrcode.react';
 import {
   Download, Calendar, Cpu, School,
   BookOpen, ThumbsUp, ThumbsDown, MessageSquare,
-  Send, Sparkles, CheckCircle2
+  Send, Sparkles, Loader2, XCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 import 'katex/dist/katex.min.css';
-
-/**
- * @file AetherNotesFormatter.tsx
- * @description Advanced Markdown & LaTeX Renderer for Statistical Research.
- * FIXED: LaTeX regex, Accessibility labels, and Print optimization.
- */
 
 interface FormatterProps {
   content: string;
@@ -30,201 +24,201 @@ interface FormatterProps {
 }
 
 const AetherNotesFormatter: React.FC<FormatterProps> = ({ content, provider, githubUrl, timestamp, noteId }) => {
-  const [userMeta, setUserMeta] = useState<{ university: string, department: string } | null>(null);
+  const [userMeta, setUserMeta] = useState<{ university: string, department: string, status?: string } | null>(null);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [isTutorOpen, setIsTutorOpen] = useState(false);
   const [tutorQuery, setTutorQuery] = useState("");
+  const [isTutorLoading, setIsTutorLoading] = useState(false);
+  const [tutorResponse, setTutorResponse] = useState<string | null>(null);
 
   useEffect(() => {
     const savedData = localStorage.getItem('aether_user_meta');
     if (savedData) {
-      setUserMeta(JSON.parse(savedData));
+      try {
+        setUserMeta(JSON.parse(savedData));
+      } catch (e) {
+        console.error("Failed to parse user metadata", e);
+      }
     }
   }, []);
 
-  /**
-   * Goal 7: High-Precision LaTeX Normalization
-   * Normalizes multiple LaTeX delimiters to standard $ and $$ for reliability.
-   */
-  const processedContent = content
-    .replace(/\\\[/g, '\n$$\n')
-    .replace(/\\\]/g, '\n$$\n')
-    .replace(/\\\(/g, '$')
-    .replace(/\\\)/g, '$')
-    .replace(/&nbsp;/g, ' ');
+  const isProUser = useMemo(() => userMeta?.status === 'pro', [userMeta]);
 
-  const exportToPDF = () => { window.print(); };
+  const processedContent = useMemo(() => {
+    return content
+      .replace(/\\\[/g, '\n$$\n')
+      .replace(/\\\]/g, '\n$$\n')
+      .replace(/\\\(/g, '$')
+      .replace(/\\\)/g, '$')
+      .replace(/&nbsp;/g, ' ');
+  }, [content]);
+
+  const exportToPDF = () => {
+    if (typeof window !== 'undefined') window.print();
+  };
 
   const handleFeedback = async (type: 'up' | 'down') => {
     setFeedback(type);
     if (noteId && noteId.length > 20) {
-      await supabase.from('aether_notes').update({ feedback: type }).eq('id', noteId);
+      const { error } = await supabase.from('aether_notes').update({ feedback: type }).eq('id', noteId);
+      if (error) console.error("Feedback update failed", error);
+    }
+  };
+
+  const handleTutorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tutorQuery.trim() || isTutorLoading) return;
+
+    setIsTutorLoading(true);
+    setTutorResponse(null);
+
+    try {
+      const response = await fetch('/api/tutor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: tutorQuery,
+          context: content,
+          isPro: isProUser
+        }),
+      });
+
+      const data = await response.json();
+      if (data.text) {
+        setTutorResponse(data.text);
+        setTutorQuery("");
+      } else {
+        setTutorResponse(data.error || "AI Engine encountered an issue.");
+      }
+    } catch (error) {
+      console.error("Tutor request failed", error);
+      setTutorResponse("Connection lost.");
+    } finally {
+      setIsTutorLoading(false);
     }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-      <div
-        id="printable-note"
-        className="bg-white rounded-[48px] shadow-2xl shadow-blue-100/50 overflow-hidden border border-gray-100 print:shadow-none print:border-none relative"
-      >
-        <div className="h-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 no-print" />
-
+      <div id="printable-note" className="bg-white rounded-[48px] shadow-2xl border border-gray-100 print:shadow-none relative">
+        <div className="h-2.5 bg-gradient-to-r from-blue-600 to-purple-600 no-print" />
         <div className="p-8 sm:p-14 print:p-0">
-          {/* Header Section */}
+          
+          {/* Metadata Header */}
           <div className="flex flex-wrap items-center justify-between gap-6 mb-10 pb-8 border-b border-gray-50">
             <div className="space-y-4">
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2.5 text-[10px] font-black text-blue-600 uppercase tracking-[0.4em]">
-                  <Cpu size={14} strokeWidth={3} /> {provider} Engine • Professional Grade
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-[0.4em] flex items-center gap-2">
+                  <Cpu size={14} /> {provider} Engine • {isProUser ? 'PRO NODE' : 'STANDARD'}
                 </div>
-                <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400 italic">
+                <div className="text-[11px] font-bold text-gray-400 flex items-center gap-2">
                   <Calendar size={14} /> {new Date(timestamp).toLocaleString()}
                 </div>
               </div>
 
+              {/* Fixed: Re-integrated School and BookOpen icons */}
               {userMeta && (
                 <div className="flex flex-wrap gap-2.5 mt-2">
-                  <div className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-50/50 border border-blue-100 rounded-full text-[10px] font-black text-blue-700 uppercase tracking-widest">
+                  <div className="px-4 py-1.5 bg-blue-50/50 border border-blue-100 rounded-full text-[10px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-1.5">
                     <School size={12} /> {userMeta.university}
                   </div>
-                  <div className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-50/50 border border-indigo-100 rounded-full text-[10px] font-black text-indigo-700 uppercase tracking-widest">
+                  <div className="px-4 py-1.5 bg-indigo-50/50 border border-indigo-100 rounded-full text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-1.5">
                     <BookOpen size={12} /> {userMeta.department}
                   </div>
                 </div>
               )}
             </div>
-
-            {githubUrl && (
-              <div
-                title="Scan to view repository"
-                className="p-3 bg-white border-2 border-gray-50 rounded-3xl shadow-sm print:hidden group hover:border-blue-100 transition-all"
-              >
-                <QRCodeCanvas value={githubUrl} size={80} />
-              </div>
-            )}
+            {githubUrl && <QRCodeCanvas value={githubUrl} size={80} />}
           </div>
 
-          {/* Research Content Area */}
-          <article className={`prose prose-blue max-w-none 
-  prose-headings:text-gray-900 prose-headings:font-black prose-headings:tracking-tighter
-  prose-p:text-gray-800 prose-p:leading-[1.9] prose-p:font-medium prose-p:text-[17px]
-  prose-strong:text-blue-700 prose-strong:font-black
-  prose-code:text-indigo-600 prose-code:bg-indigo-50/80 prose-code:px-2 prose-code:py-0.5 prose-code:rounded-lg prose-code:before:content-none prose-code:after:content-none
-  [&_.katex-display]:my-10 [&_.katex-display]:py-10 [&_.katex-display]:bg-gray-50/50 [&_.katex-display]:rounded-[40px] [&_.katex-display]:border [&_.katex-display]:border-gray-100
-  [&_.katex]:text-[1.2em] [&_table]:rounded-3xl [&_table]:overflow-hidden [&_table]:border-collapse`}>
-            <ReactMarkdown
-              remarkPlugins={[remarkMath, remarkGfm]}
-              rehypePlugins={[rehypeKatex]}
-            >
+          <article className="prose prose-blue max-w-none">
+            <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]}>
               {processedContent}
             </ReactMarkdown>
           </article>
-          {/* Footer Telemetry */}
+
+          {/* Academic Footer */}
           <div className="mt-20 pt-10 border-t border-gray-100 flex flex-wrap justify-between items-center gap-4 text-[9px] text-gray-400 font-black tracking-[0.3em] uppercase">
             <div className="flex items-center gap-2">
               <Sparkles size={12} className="text-blue-500" />
-              <span>AETHER SYSTEM v1.0.4 • Academic Archive</span>
+              <span>AETHER SYSTEM v1.0.4 • {isProUser ? 'PRO VERSION' : 'ACADEMIC ARCHIVE'}</span>
             </div>
             <span>{userMeta?.university || 'RESTRICTED ACCESS'} • SECURE NODE</span>
           </div>
         </div>
       </div>
 
-      {/* Control Toolbar */}
+      {/* Control Buttons */}
       <div className="flex flex-col gap-6 no-print">
-        <div className="flex flex-wrap gap-4 justify-center">
-          <button
-            onClick={exportToPDF}
-            title="Download notes as PDF"
-            className="flex items-center gap-3 px-10 py-5 bg-gray-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition-all active:scale-95 shadow-2xl"
-          >
-            <Download size={18} /> Export Research Asset
+        <div className="flex flex-wrap gap-4 justify-center items-center">
+          <button onClick={exportToPDF} className="flex items-center gap-3 px-8 py-4 bg-gray-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl transition-all hover:bg-blue-600">
+            <Download size={18} /> Export PDF
           </button>
-
-          <button
-            onClick={() => setIsTutorOpen(!isTutorOpen)}
-            title="Interact with AI Tutor"
-            className={`flex items-center gap-3 px-10 py-5 rounded-3xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl ${isTutorOpen ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border-2 border-gray-100 hover:border-indigo-200'
-              }`}
-          >
-            <MessageSquare size={18} /> {isTutorOpen ? 'Suspend Tutor' : 'Engage Tutor'}
+          <button onClick={() => setIsTutorOpen(!isTutorOpen)} className={`flex items-center gap-3 px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest transition-all shadow-xl ${isTutorOpen ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border-2 border-gray-100'}`}>
+            <MessageSquare size={18} /> {isTutorOpen ? 'Close Tutor' : 'Engage Tutor'}
           </button>
-
-          {/* Feedback Protocol (Goal 8) */}
-          <div className="flex items-center bg-white border-2 border-gray-100 rounded-3xl px-3 shadow-xl">
-            <button
-              onClick={() => handleFeedback('up')}
-              title="Positive Precision"
-              aria-label="Positive Feedback"
-              className={`p-3.5 rounded-2xl transition-all ${feedback === 'up' ? 'text-green-600 bg-green-50' : 'text-gray-300 hover:text-green-500'}`}
-            >
+          
+          <div className="flex items-center bg-white border-2 border-gray-100 rounded-3xl px-3 py-1 shadow-lg">
+            <button onClick={() => handleFeedback('up')} title="Helpful" className={`p-2 transition-colors ${feedback === 'up' ? 'text-green-600' : 'text-gray-300'}`}>
               <ThumbsUp size={20} />
             </button>
-            <div className="w-px h-8 bg-gray-100 mx-2" />
-            <button
-              onClick={() => handleFeedback('down')}
-              title="Accuracy Alert"
-              aria-label="Negative Feedback"
-              className={`p-3.5 rounded-2xl transition-all ${feedback === 'down' ? 'text-red-600 bg-red-50' : 'text-gray-300 hover:text-red-500'}`}
-            >
+            <div className="w-px h-6 bg-gray-100 mx-2" />
+            <button onClick={() => handleFeedback('down')} title="Not Helpful" className={`p-2 transition-colors ${feedback === 'down' ? 'text-red-600' : 'text-gray-300'}`}>
               <ThumbsDown size={20} />
             </button>
           </div>
         </div>
 
-        {/* AI Tutor Interface */}
+        {/* AI Tutor Panel */}
         {isTutorOpen && (
-          <div className="max-w-2xl mx-auto w-full bg-indigo-50/40 border-2 border-indigo-100/50 rounded-[40px] p-8 animate-in zoom-in-95 duration-500 shadow-inner">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="p-2.5 bg-indigo-600 rounded-2xl text-white">
-                <CheckCircle2 size={18} />
+          <div className="max-w-2xl mx-auto w-full bg-white/90 backdrop-blur-xl border-2 border-indigo-100 rounded-[40px] p-8 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-indigo-50 pb-4">
+              <div className="flex items-center gap-3">
+                <Sparkles className="text-indigo-600" size={18} />
+                <p className="text-[13px] font-bold text-indigo-900">Aether AI Tutor</p>
               </div>
-              <p className="text-[12px] font-black uppercase tracking-[0.2em] text-indigo-900">Aether Tutor Protocol Active</p>
+              {tutorResponse && (
+                <button onClick={() => setTutorResponse(null)} title="Clear Response" className="text-gray-400 hover:text-red-500 transition-colors">
+                  <XCircle size={20} />
+                </button>
+              )}
             </div>
-            <div className="relative">
+
+            <div className="min-h-[100px] overflow-y-auto">
+              {isTutorLoading ? (
+                <div className="flex flex-col items-center py-6">
+                  <Loader2 className="animate-spin text-indigo-600 mb-2" size={30} />
+                  <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Processing...</p>
+                </div>
+              ) : tutorResponse && (
+                <div className="bg-indigo-50/50 rounded-[32px] p-6 text-gray-700">
+                  <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]}>
+                    {tutorResponse}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleTutorSubmit} className="relative">
               <input
                 type="text"
-                title="Ask a follow-up question"
                 value={tutorQuery}
                 onChange={(e) => setTutorQuery(e.target.value)}
-                placeholder="Ask for formula simplification or proof..."
-                className="w-full p-5 pr-16 bg-white border-2 border-indigo-100 rounded-[24px] text-sm font-bold focus:ring-[12px] focus:ring-indigo-100 outline-none transition-all shadow-sm placeholder:text-gray-300"
+                placeholder="Ask something..."
+                className="w-full p-5 pr-16 bg-white border-2 border-indigo-100 rounded-[24px] focus:outline-none focus:border-indigo-400"
               />
-              <button
-                title="Send query"
-                aria-label="Send query"
-                className="absolute right-2.5 top-2.5 p-3.5 bg-indigo-600 text-white rounded-[18px] hover:bg-gray-900 transition-all shadow-md"
+              <button 
+                type="submit" 
+                disabled={isTutorLoading || !tutorQuery.trim()} 
+                title="Send Inquiry"
+                className="absolute right-2.5 top-2.5 p-3.5 bg-indigo-600 text-white rounded-[18px] hover:scale-105 active:scale-95 transition-all disabled:opacity-50 shadow-md"
               >
                 <Send size={20} />
               </button>
-            </div>
+            </form>
           </div>
         )}
       </div>
-
-      <style jsx global>{`
-        @media print {
-          @page { margin: 20mm; }
-          body * { visibility: hidden; }
-          #printable-note, #printable-note * { visibility: visible; }
-          #printable-note {
-            position: absolute; left: 0; top: 0; width: 100%; border: none !important;
-          }
-          .no-print { display: none !important; }
-        }
-        /* Goal 7: Mathematical Precision Styling */
-        .katex { font-size: 1.25em !important; font-weight: 700; color: #1e3a8a; }
-        .katex-display { 
-          overflow-x: auto; 
-          overflow-y: hidden; 
-          padding: 2rem;
-          scrollbar-width: thin;
-        }
-        .prose table { width: 100%; border-collapse: separate; border-spacing: 0; }
-        .prose th { background: #f8fafc; padding: 12px; font-weight: 900; text-transform: uppercase; font-size: 10px; tracking: 0.1em; }
-        .prose td { padding: 12px; border-bottom: 1px solid #f1f5f9; }
-      `}</style>
     </div>
   );
 };
