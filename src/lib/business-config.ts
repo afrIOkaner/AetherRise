@@ -8,11 +8,11 @@ export const AETHER_CONFIG = {
   // Brand Identity
   BRAND: {
     NAME: "AetherRise",
-    FULL_NAME: "AetherRise AI Core",
+    FULL_NAME: "AetherRise Aura Core",
     SLOGAN: "Advanced AI Academic Assistant",
+    ORGANIZATION: "DasOrbital Technologies",
     INSTITUTION: "Begum Rokeya University, Rangpur",
-    DEPARTMENT: "Statistics",
-    TAGLINE: "Precision Analytics for Modern Statisticians",
+    TAGLINE: "Precision Analytics for Modern Science",
   },
 
   // Database & Storage Mapping (Added for consistency)
@@ -70,7 +70,7 @@ export const AETHER_CONFIG = {
   // SEO & PWA Metadata
   METADATA: {
     TITLE: "AetherRise | BRUR Statistics AI Core",
-    DESCRIPTION: "The ultimate AI assistant for Statistics students at Begum Rokeya University, Rangpur.",
+    DESCRIPTION: "The ultimate AI assistant for students and researchers. Get precise analytics, instant notes, and more.",
     THEME_COLOR: "#2563eb",
     BACKGROUND_COLOR: "#ffffff",
   }

@@ -141,7 +141,7 @@ export default function AetherDashboard() {
 
     recognition.start();
   };
-
+<p className="text-gray-500 mb-8">Precision Analytics for Modern Science</p>
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isOffline) return;
@@ -230,7 +230,7 @@ export default function AetherDashboard() {
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Ask anything about Statistics..."
+              placeholder="Ask anything..."
               className="w-full p-10 bg-gray-50/50 rounded-[38px] min-h-[300px] outline-none resize-none pb-32"
             />
             
