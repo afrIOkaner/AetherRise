@@ -42,21 +42,6 @@
         "description": "View your saved academic assets",
         "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
     }],
-    "screenshots": [{
-            "src": "/icon-512x512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "form_factor": "wide",
-            "label": "AetherRise Intelligence Dashboard"
-        },
-        {
-            "src": "/icon-512x512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "form_factor": "narrow",
-            "label": "Mobile AI Assistant"
-        }
-    ],
     "categories": ["education", "productivity", "utilities"],
     "prefer_related_applications": false,
     "launch_handler": {
