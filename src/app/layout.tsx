@@ -1,48 +1,39 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { ReactNode } from "react";
+import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext"; 
+import { Metadata, Viewport } from "next"; // Viewport 
 
-export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
-  // if the 'next' parameter is not present, redirect to the dashboard
-  const next = searchParams.get('next') ?? '/';
+// --- [SECTION: METADATA CONFIGURATION] ---
+export const metadata: Metadata = {
+  title: "AetherRise Aura Core",
+  description: "Enterprise-grade AI Orchestrator",
+  manifest: "/manifest.json", 
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "AetherRise",
+  },
+};
 
-  if (code) {
-    const cookieStore = await cookies();
-    
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => {
-                cookieStore.set(name, value, options);
-              });
-            } catch (error) {
-              // router errors can occur if the cookie string is malformed or if there are issues with the cookie store
-              console.error("Cookie setting error:", error);
-            }
-          },
-        },
-      }
-    );
-    
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    
-    if (!error) {
-      // if auth is successful, redirect to the next page (default is dashboard)
-      return NextResponse.redirect(`${origin}${next}`);
-    } else {
-      console.error("Auth Exchange Error:", error.message);
-    }
-  }
+// Next.js 14+  viewport definition for improved mobile responsiveness and control over scaling behavior. This configuration ensures that the app is optimized for various devices, providing a better user experience on smartphones and tablets by preventing unwanted zooming and ensuring the layout adapts to the screen size effectively.
+export const viewport: Viewport = {
+  themeColor: "#2563eb",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
 
-  // if code is missing or auth fails, redirect to home or an error page
-  return NextResponse.redirect(`${origin}/`);
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body className="antialiased">
+        {/* AuthProvider wraps the app to manage global user state.
+          The 'mounted' check inside AuthProvider will prevent SSR hydration issues.
+        */}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
+    </html>
+  );
 }

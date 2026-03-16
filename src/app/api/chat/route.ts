@@ -1,77 +1,94 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { runAetherEngine } from "@/lib/ai-engine"; 
-import { AETHER_CONFIG } from "@/lib/business-config";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextResponse } from 'next/server';
 
 /**
- * @file route.ts
- * @description Enhanced API Route with Sync Status tracking and optimized DB persistence.
+ * [SECTION: API KEY CONFIGURATION]
+ * tiered API key management for improved reliability and performance. Basic keys are used for standard queries, while Pro keys are reserved for high-priority or complex research tasks. This setup allows for better load distribution and ensures that critical queries have access to more powerful resources when needed.
  */
+const BASIC_KEYS = [
+  process.env.GEMINI_KEY_1, 
+  process.env.GEMINI_KEY_2, 
+  process.env.GEMINI_KEY_3
+].filter(Boolean) as string[];
+
+const PRO_KEYS = [
+  process.env.GEMINI_KEY_4, 
+  process.env.GEMINI_KEY_5
+].filter(Boolean) as string[];
+
+/**
+ * [SECTION: IMPROVED SYSTEM PROMPT]
+ *Output quality enhancement through a more detailed and structured system prompt. This prompt guides the AI to produce more precise, well-organized, and academically rigorous responses, which is crucial for research-related queries. By specifying formatting rules, tone, and content structure, we can ensure that the generated output meets higher standards of clarity and professionalism.
+ */
+const AETHER_ACADEMIC_PROMPT = `
+You are the "Aether AI Research Engine" (Version 3.0). Your mission is to assist researchers and students with high-precision academic content.
+Follow these formatting rules strictly:
+1. **Language**: Respond in the language of the user's query (Bengali/English).
+2. **Structure**: 
+   - Start with a clear # Title.
+   - Provide a brief ## Abstract/Overview.
+   - Use ## Key Analysis for the main body with bullet points.
+   - Include a ## Methodology or Technical Insight section if applicable.
+   - End with a ## Conclusion.
+3. **Math & Science**: Use LaTeX for ALL equations and scientific notations. Inline: $E=mc^2$, Block: $$...$$.
+4. **Tone**: Maintain a professional, objective, and scholarly tone. No conversational filler.
+5. **Citations**: If the user provides context, cite specific parts of it.
+`;
 
 export async function POST(req: Request) {
   try {
-    const { messages, userId, isPro, university, department } = await req.json();
-    const lastMessage = messages[messages.length - 1].content;
-    
-    // 1. Role Validation
-    const validatedRole = isPro ? "student" : "guest"; 
+    const { query, context, isPro } = await req.json();
 
-    // 2. Execute Aether Engine (Sync to GitHub enabled)
-    const aiResponse = await runAetherEngine({
-      prompt: lastMessage,
-      userId: userId,
-      userRole: validatedRole,
-      university: university || AETHER_CONFIG.BRAND.INSTITUTION,
-      department: department || AETHER_CONFIG.BRAND.DEPARTMENT,
-      syncToGithub: true 
-    });
+    if (!query) {
+      return NextResponse.json({ error: "Research query is required" }, { status: 400 });
+    }
 
-    // 3. Initialize Supabase
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    
-    // 4. Persistence Logic
-    if (userId && userId !== "anonymous") {
-      // Usage increment tracking
+    // [SECTION: AUTO-HEALING NODE SELECTION]
+    const activeKeySet = isPro ? [...PRO_KEYS, ...BASIC_KEYS] : BASIC_KEYS;
+    let lastErrorMessage = "All research nodes are currently saturated.";
+
+    for (const key of activeKeySet) {
       try {
-        await supabase.rpc('increment_usage', { user_id_input: userId });
-      } catch (e) {
-        console.error("[RPC_ERROR]: Usage limit tracking failed.");
-      }
+        const genAI = new GoogleGenerativeAI(key);
+        
+        // [SECTION: MODEL INITIALIZATION]
+        const model = genAI.getGenerativeModel({ 
+          model: isPro ? "gemini-1.5-pro" : "gemini-1.5-flash",
+          systemInstruction: AETHER_ACADEMIC_PROMPT, // Enhanced quality instruction
+        });
 
-      // Check if GitHub Sync was successful
-      const isSynced = !!aiResponse.githubUrl;
+        // Prompt formatting for better context injection
+        const finalPrompt = context 
+          ? `[ACADEMIC CONTEXT PROVIDED]:\n${context}\n\n[USER QUERY]:\n${query}`
+          : query;
 
-      // Insert into 'aether_notes' with all metadata
-      const { error: insertError } = await supabase.from("aether_notes").insert({
-        user_id: userId,
-        content: aiResponse.content,
-        github_url: aiResponse.githubUrl || null,
-        sync_status: isSynced ? 'completed' : 'failed', // Sync status tracking
-        university: university || AETHER_CONFIG.BRAND.INSTITUTION,
-        department: department || AETHER_CONFIG.BRAND.DEPARTMENT,
-        word_count: aiResponse.content.split(/\s+/).length,
-        model_provider: aiResponse.provider // Which model was used for generation
-      });
+        const result = await model.generateContent(finalPrompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        // [SECTION: RESPONSE VALIDATION]
+        return NextResponse.json({ text });
 
-      if (insertError) {
-        console.error("[VAULT_ERROR]:", insertError.message);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.warn(`Node failure: ${error.message}. Switching node...`);
+          lastErrorMessage = error.message;
+        }
+        continue; // Try the next key/node in case of failure
       }
     }
 
-    // 5. Success Response
-    return NextResponse.json({ 
-      text: aiResponse.content, 
-      model: aiResponse.provider,
-      githubUrl: aiResponse.githubUrl 
-    });
-
-  } catch (error: any) {
-    console.error("[ROUTE_CRITICAL_ERROR]:", error);
     return NextResponse.json(
-      { error: "Neural Grid Timeout. Please synchronize again in 30s." }, 
+      { error: `Aether Engine Node Failure: ${lastErrorMessage}` }, 
+      { status: 503 }
+    );
+
+  } catch (error: unknown) {
+    const finalMessage = error instanceof Error ? error.message : "Critical system failure";
+    console.error("System Error:", finalMessage);
+    
+    return NextResponse.json(
+      { error: `Internal Engine Error: ${finalMessage}` }, 
       { status: 500 }
     );
   }
