@@ -13,11 +13,11 @@ import ClientLayout from "@/components/ClientLayout";
 const inter = Inter({ subsets: ["latin"] });
 
 /**
- * @description Global SEO Metadata - Configured for PWA and Social Sharing
+ * @description Global SEO Metadata - Title set to Line 18
  */
 export const metadata: Metadata = {
-  title: AETHER_CONFIG.METADATA.TITLE,
-  description: AETHER_CONFIG.METADATA.DESCRIPTION,
+  title: "AetherRise | Aura Core", // LINE 18: Updated to your requirement
+  description: AETHER_CONFIG.METADATA.DESCRIPTION, // Using config for description
   manifest: "/manifest.json",
   icons: {
     apple: "/icon-512x512.png", 
@@ -26,12 +26,12 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: AETHER_CONFIG.BRAND.NAME,
+    title: "AetherRise",
   },
 };
 
 /**
- * @description Viewport settings to ensure native mobile feel (Disable user scaling)
+ * @description Viewport settings to ensure native mobile feel
  */
 export const viewport: Viewport = {
   width: "device-width",
@@ -50,10 +50,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          {/* Handles PWA Service Worker background registration */}
+          {/* Service Worker for PWA/Offline support */}
           <ServiceWorkerRegistration />
 
-          {/* ClientLayout manages conditional sidebar rendering based on routes */}
+          {/* ClientLayout manages conditional sidebar visibility */}
           <ClientLayout>
             {children}
           </ClientLayout>
