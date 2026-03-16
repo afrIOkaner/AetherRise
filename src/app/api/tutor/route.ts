@@ -1,12 +1,16 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from 'next/server';
 
-/**
- * Categorizing API Keys based on User Tier
- * Keys 1-3 for Basic users, Keys 4-5 for Pro users
- */
-const BASIC_KEYS = [process.env.GEMINI_KEY_1, process.env.GEMINI_KEY_2, process.env.GEMINI_KEY_3].filter(Boolean) as string[];
-const PRO_KEYS = [process.env.GEMINI_KEY_4, process.env.GEMINI_KEY_5].filter(Boolean) as string[];
+const BASIC_KEYS = [
+  process.env.GEMINI_KEY_1, 
+  process.env.GEMINI_KEY_2, 
+  process.env.GEMINI_KEY_3
+].filter(Boolean) as string[];
+
+const PRO_KEYS = [
+  process.env.GEMINI_KEY_4, 
+  process.env.GEMINI_KEY_5
+].filter(Boolean) as string[];
 
 export async function POST(req: Request) {
   try {
@@ -16,52 +20,52 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    /**
-     * Auto-healing logic chooses the key set based on user tier.
-     * Pro users get priority access to nodes 4 and 5.
-     */
+    // Pro users get their specific keys first, then fallback to basic keys
     const activeKeySet = isPro ? [...PRO_KEYS, ...BASIC_KEYS] : BASIC_KEYS;
     
-    let lastErrorMessage = "All designated nodes exhausted.";
+    let lastErrorMessage = "All API nodes are currently exhausted.";
 
     for (const key of activeKeySet) {
       try {
         const genAI = new GoogleGenerativeAI(key);
-        // Pro users get the stronger 1.5-pro model for complex reasoning
-        const model = genAI.getGenerativeModel({ model: isPro ? "gemini-1.5-pro" : "gemini-1.5-flash" });
-
-        const systemPrompt = `
-          You are Aether Tutor, an expert academic assistant. 
-          Context: ${context || 'No context'}
-          Question: ${query}
-          Instruction: Use LaTeX for math and provide a precise academic response.
-        `;
-
-        const result = await model.generateContent(systemPrompt);
-        const response = await result.response;
         
-        return NextResponse.json({ text: response.text() });
+        // BETTER: Define the persona here as a System Instruction
+        const model = genAI.getGenerativeModel({ 
+          model: isPro ? "gemini-1.5-pro" : "gemini-1.5-flash",
+          systemInstruction: "You are Aether Tutor, an expert academic assistant. Use LaTeX for math equations. Provide precise, structured, and helpful responses. If context is provided, prioritize it."
+        });
+
+        // Separate context from the user query for clarity
+        const finalPrompt = `Context: ${context || 'General Knowledge'}\n\nQuestion: ${query}`;
+
+        const result = await model.generateContent(finalPrompt);
+        const response = await result.response;
+        const text = response.text();
+
+        return NextResponse.json({ text });
 
       } catch (error: unknown) {
-        /**
-         * Safely extract error message without using 'any'
-         */
         if (error instanceof Error) {
-          console.warn(`Node failure: ${error.message}. Retrying...`);
+          // If a key is rate-limited (429) or invalid, we catch it and 'continue' the loop
+          console.warn(`Node failure detected: ${error.message}. Moving to next node...`);
           lastErrorMessage = error.message;
         }
-        continue;
+        continue; // Try the next key in the array
       }
     }
 
-    throw new Error(lastErrorMessage);
+    // If the loop finishes without returning, it means all keys failed
+    return NextResponse.json(
+      { error: `Aether Engine Node Failure: ${lastErrorMessage}` }, 
+      { status: 503 }
+    );
 
   } catch (error: unknown) {
     const finalMessage = error instanceof Error ? error.message : "Unknown critical failure";
-    console.error("Aether Engine Critical Failure:", finalMessage);
+    console.error("Critical System Error:", finalMessage);
     
     return NextResponse.json(
-      { error: `Auto-healing engine failed: ${finalMessage}` }, 
+      { error: `Internal Engine Error: ${finalMessage}` }, 
       { status: 500 }
     );
   }

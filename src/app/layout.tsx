@@ -1,64 +1,48 @@
-import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 
-/**
- * @description Import core providers and layout components
- */
-import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
-import { AuthProvider } from "@/context/AuthContext"; 
-import { AETHER_CONFIG } from "@/lib/business-config";
-import ClientLayout from "@/components/ClientLayout"; 
+export async function GET(request: Request) {
+  const { searchParams, origin } = new URL(request.url);
+  const code = searchParams.get('code');
+  // if the 'next' parameter is not present, redirect to the dashboard
+  const next = searchParams.get('next') ?? '/';
 
-const inter = Inter({ subsets: ["latin"] });
+  if (code) {
+    const cookieStore = await cookies();
+    
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => {
+                cookieStore.set(name, value, options);
+              });
+            } catch (error) {
+              // router errors can occur if the cookie string is malformed or if there are issues with the cookie store
+              console.error("Cookie setting error:", error);
+            }
+          },
+        },
+      }
+    );
+    
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    
+    if (!error) {
+      // if auth is successful, redirect to the next page (default is dashboard)
+      return NextResponse.redirect(`${origin}${next}`);
+    } else {
+      console.error("Auth Exchange Error:", error.message);
+    }
+  }
 
-/**
- * @description Global SEO Metadata - Title set to Line 18
- */
-export const metadata: Metadata = {
-  title: "AetherRise | Aura Core", // LINE 18: Updated to your requirement
-  description: AETHER_CONFIG.METADATA.DESCRIPTION, // Using config for description
-  manifest: "/manifest.json",
-  icons: {
-    apple: "/icon-512x512.png", 
-    icon: "/icon-192x192.png",
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "AetherRise",
-  },
-};
-
-/**
- * @description Viewport settings to ensure native mobile feel
- */
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  themeColor: "#2563eb",
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body className={inter.className}>
-        <AuthProvider>
-          {/* Service Worker for PWA/Offline support */}
-          <ServiceWorkerRegistration />
-
-          {/* ClientLayout manages conditional sidebar visibility */}
-          <ClientLayout>
-            {children}
-          </ClientLayout>
-        </AuthProvider>
-      </body>
-    </html>
-  );
+  // if code is missing or auth fails, redirect to home or an error page
+  return NextResponse.redirect(`${origin}/`);
 }
