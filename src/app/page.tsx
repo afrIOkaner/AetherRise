@@ -41,6 +41,12 @@ export default function AetherHomePage() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
 
+  const [repos, setRepos] = useState<string[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState("");
+  const [isRepoLoading, setIsRepoLoading] = useState(false);
+  const [isPushingGithub, setIsPushingGithub] = useState(false);
+  const [githubMessage, setGithubMessage] = useState("");
+
   const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -138,6 +144,126 @@ export default function AetherHomePage() {
     setIsEmailLoading(false);
   };
 
+  const connectGitHub = () => {
+    const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+
+    if (!clientId || !user) {
+      setErrorMessage("GitHub connection is not available.");
+      return;
+    }
+
+    const state = user.id;
+
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&state=${state}`;
+  };
+
+  const loadGitHubRepos = async () => {
+    try {
+      setIsRepoLoading(true);
+      setGithubMessage("");
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch("/api/github/repos", {
+        headers: {
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to load repositories.");
+      }
+
+      setRepos(
+        Array.isArray(data.repos)
+          ? data.repos.map((repo: { full_name: string }) => repo.full_name)
+          : []
+      );
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load repositories.";
+      setGithubMessage(message);
+    } finally {
+      setIsRepoLoading(false);
+    }
+  };
+
+  const saveSelectedRepo = async () => {
+    if (!selectedRepo) return;
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch("/api/github/select-repo", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+        },
+        body: JSON.stringify({
+          repo: selectedRepo,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to save repository.");
+      }
+
+      setGithubMessage("Repository selected successfully.");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to save repository.";
+      setGithubMessage(message);
+    }
+  };
+
+  const pushCurrentNoteToGitHub = async () => {
+    if (!result) return;
+
+    try {
+      setIsPushingGithub(true);
+      setGithubMessage("");
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch("/api/github/push-note", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+        },
+        body: JSON.stringify({
+          title: prompt.trim().slice(0, 60) || "Aether Note",
+          content: result.content,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to push note.");
+      }
+
+      setGithubMessage("Note pushed to GitHub successfully.");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to push note.";
+      setGithubMessage(message);
+    } finally {
+      setIsPushingGithub(false);
+    }
+  };
+
   const handleGenerate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -165,7 +291,7 @@ export default function AetherHomePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
         },
         body: JSON.stringify({
           query: prompt.trim(),
@@ -186,7 +312,7 @@ export default function AetherHomePage() {
         content: data.text,
         provider: data.provider || "gemini",
         timestamp: new Date().toISOString(),
-        github_url: null,
+        github_url: data.githubUrl || null,
       });
     } catch (error: unknown) {
       const message =
@@ -349,6 +475,20 @@ export default function AetherHomePage() {
               </button>
             )}
 
+            <button
+              onClick={connectGitHub}
+              className="rounded-xl bg-gray-900 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-black"
+            >
+              Connect GitHub
+            </button>
+
+            <button
+              onClick={loadGitHubRepos}
+              className="rounded-xl border border-gray-200 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-700 transition hover:bg-gray-50"
+            >
+              {isRepoLoading ? "Loading..." : "Load Repos"}
+            </button>
+
             <Link
               href="/dashboard"
               className="rounded-xl border border-gray-200 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-700 transition hover:bg-gray-50"
@@ -375,6 +515,38 @@ export default function AetherHomePage() {
           <p className="text-sm text-gray-500">
             Continue your research journey.
           </p>
+        </div>
+
+        <div className="mb-6 space-y-3">
+          <div className="flex flex-wrap gap-3">
+            <select
+              aria-label="Select GitHub Repository"
+              value={selectedRepo}
+              onChange={(e) => setSelectedRepo(e.target.value)}
+              className="rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700"
+            >
+              <option value="">Select GitHub Repository</option>
+              {repos.map((repo) => (
+                <option key={repo} value={repo}>
+                  {repo}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={saveSelectedRepo}
+              disabled={!selectedRepo || isRepoLoading}
+              className="rounded-xl bg-blue-600 px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-blue-700 disabled:opacity-50"
+            >
+              Save Repo
+            </button>
+          </div>
+
+          {githubMessage && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+              {githubMessage}
+            </div>
+          )}
         </div>
 
         <div className="mb-8 rounded-[32px] border border-gray-100 bg-white p-3 shadow-2xl shadow-blue-50/50">
@@ -435,6 +607,14 @@ export default function AetherHomePage() {
                   className="rounded-2xl bg-gray-900 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-black disabled:opacity-50"
                 >
                   {isSaving ? "Saving..." : "Save Note"}
+                </button>
+
+                <button
+                  onClick={pushCurrentNoteToGitHub}
+                  disabled={isPushingGithub}
+                  className="rounded-2xl bg-blue-600 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isPushingGithub ? "Pushing..." : "Push to GitHub"}
                 </button>
 
                 <button
