@@ -189,7 +189,7 @@ const AetherNotesFormatter: React.FC<FormatterProps> = ({
             {githubUrl && <QRCodeCanvas value={githubUrl} size={80} />}
           </div>
 
-          <article className="prose prose-blue max-w-none">
+          <article className="prose prose-blue max-w-none prose-p:text-gray-800 prose-headings:text-gray-900">
             <ReactMarkdown
               remarkPlugins={[remarkMath, remarkGfm]}
               rehypePlugins={[rehypeKatex]}
