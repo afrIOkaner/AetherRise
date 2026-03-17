@@ -3,11 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Sparkles, LogOut, Cpu, Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import AetherNotesFormatter from "@/components/aether/AetherNotesFormatter";
 import { AETHER_CONFIG } from "@/lib/business-config";
+import { Loader2, Sparkles, LogOut, Cpu, Download, LayoutDashboard, Github,} from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -453,59 +453,75 @@ export default function AetherHomePage() {
 
   return (
     <div className="min-h-screen bg-[#fcfcfc]">
-      <header className="sticky top-0 z-50 border-b bg-white/85 backdrop-blur-md">
-        <div className="mx-auto flex h-20 max-w-5xl items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-blue-600 p-2 text-white">
-              <Cpu size={20} />
-            </div>
-            <h1 className="text-lg font-black uppercase tracking-tighter text-gray-900">
-              {AETHER_CONFIG?.BRAND?.NAME || "AETHERRISE"}
-            </h1>
-          </div>
+      <header className="sticky top-0 z-50 border-b bg-white/90 backdrop-blur-md">
+  <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-3 sm:h-20 sm:px-6">
+    <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+      <div className="shrink-0 rounded-xl bg-blue-600 p-2 text-white">
+        <Cpu size={18} className="sm:hidden" />
+        <Cpu size={20} className="hidden sm:block" />
+      </div>
 
-          <div className="flex items-center gap-3">
-            {deferredPrompt && (
-              <button
-                onClick={handleInstallApp}
-                className="flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 transition hover:bg-blue-100"
-              >
-                <Download size={14} />
-                Install
-              </button>
-            )}
+      <div className="min-w-0">
+        <h1 className="truncate text-sm font-black uppercase tracking-tight text-gray-900 sm:text-lg">
+          {AETHER_CONFIG?.BRAND?.NAME || "AETHERRISE"}
+        </h1>
+        <p className="hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400 sm:block">
+          AI Research Engine
+        </p>
+      </div>
+    </div>
 
-            <button
-              onClick={connectGitHub}
-              className="rounded-xl bg-gray-900 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-black"
-            >
-              Connect GitHub
-            </button>
+    <div className="flex items-center gap-1.5 sm:gap-2">
+      {deferredPrompt && (
+        <button
+          onClick={handleInstallApp}
+          title="Install App"
+          className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition hover:bg-blue-100 sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-[10px] sm:font-black sm:uppercase sm:tracking-[0.2em]"
+        >
+          <Download size={16} />
+          <span className="hidden sm:inline">Install</span>
+        </button>
+      )}
 
-            <button
-              onClick={loadGitHubRepos}
-              className="rounded-xl border border-gray-200 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-700 transition hover:bg-gray-50"
-            >
-              {isRepoLoading ? "Loading..." : "Load Repos"}
-            </button>
+      <button
+        onClick={connectGitHub}
+        title="Connect GitHub"
+        className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-900 text-white transition hover:bg-black sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-[10px] sm:font-black sm:uppercase sm:tracking-[0.2em]"
+      >
+        <Github size={16} />
+        <span className="hidden sm:inline">GitHub</span>
+      </button>
 
-            <Link
-              href="/dashboard"
-              className="rounded-xl border border-gray-200 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-700 transition hover:bg-gray-50"
-            >
-              Dashboard
-            </Link>
+      <button
+        onClick={loadGitHubRepos}
+        title="Load Repositories"
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-700 transition hover:bg-gray-50 sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-[10px] sm:font-black sm:uppercase sm:tracking-[0.2em]"
+      >
+        <span className="text-xs sm:hidden">R</span>
+        <span className="hidden sm:inline">
+          {isRepoLoading ? "Loading..." : "Load Repos"}
+        </span>
+      </button>
 
-            <button
-              onClick={handleLogout}
-              className="rounded-xl p-2 text-gray-500 transition hover:text-red-500"
-              aria-label="Sign out"
-            >
-              <LogOut size={20} />
-            </button>
-          </div>
-        </div>
-      </header>
+      <Link
+        href="/dashboard"
+        title="Dashboard"
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-700 transition hover:bg-gray-50"
+      >
+        <LayoutDashboard size={18} />
+      </Link>
+
+      <button
+        onClick={handleLogout}
+        title="Sign out"
+        className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition hover:bg-red-50 hover:text-red-500"
+        aria-label="Sign out"
+      >
+        <LogOut size={18} />
+      </button>
+    </div>
+  </div>
+</header>
 
       <main className="mx-auto max-w-4xl px-6 pb-20 pt-10">
         <div className="mb-6">
