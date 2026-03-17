@@ -1,9 +1,19 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
-
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+  useCallback,
+} from "react";
+import {
+  User,
+  Session,
+  AuthChangeEvent,
+} from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
 
 interface UserProfile {
   id: string;
@@ -11,14 +21,14 @@ interface UserProfile {
   full_name: string | null;
   university: string | null;
   department: string | null;
-  tier: 'free' | 'pro' | 'ultra';
+  tier: "free" | "flash" | "pro";
 }
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  profile: UserProfile | null; 
+  profile: UserProfile | null;
   signOut: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -28,94 +38,93 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);  const [loading, setLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Profile fetching logic with stable reference
-  const fetchProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (!error && data) {
-      setProfile(data as UserProfile);
-    }
-  }, []);
-
-  // Syncing logic for new users
   const syncProfile = useCallback(async (authUser: User) => {
     const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .single();
-
-    if (error || !data) {
-      const { data: newProfile, error: insertError } = await supabase
-        .from('profiles')
-        .upsert({
+      .from("profiles")
+      .upsert(
+        {
           id: authUser.id,
           email: authUser.email,
-          full_name: authUser.user_metadata?.full_name || 'Aether User',
-          university: 'Begum Rokeya University, Rangpur',
-          department: 'Statistics',
-          tier: 'free'
-        })
-        .select()
-        .single();
+          full_name:
+            authUser.user_metadata?.full_name ||
+            authUser.user_metadata?.name ||
+            "Aether User",
+          university: "Begum Rokeya University, Rangpur",
+          department: "Statistics",
+          tier: "free",
+        },
+        { onConflict: "id" }
+      )
+      .select("id, email, full_name, university, department, tier")
+      .single();
 
-      if (!insertError && newProfile) {
-        setProfile(newProfile as UserProfile);
-      }
-    } else {
-      setProfile(data as UserProfile);
+    if (error) {
+      setProfile(null);
+      return;
     }
+
+    setProfile(data as UserProfile);
   }, []);
 
   useEffect(() => {
-    setMounted(true);
-
     const initializeAuth = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession();
+
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-      if (currentSession?.user) await fetchProfile(currentSession.user.id);
+
+      if (currentSession?.user) {
+        await syncProfile(currentSession.user);
+      } else {
+        setProfile(null);
+      }
+
       setLoading(false);
     };
 
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      if (currentUser) {
-        await syncProfile(currentUser);
-      } else {
-        setProfile(null);
-      }
-      setLoading(false);
-    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      async (_event: AuthChangeEvent, newSession: Session | null) => {
+        setSession(newSession);
+        const currentUser = newSession?.user ?? null;
+        setUser(currentUser);
 
-    return () => subscription.unsubscribe();
-  }, [fetchProfile, syncProfile]);
+        if (currentUser) {
+          await syncProfile(currentUser);
+        } else {
+          setProfile(null);
+        }
+
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [syncProfile]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setProfile(null);
   };
 
   const logout = signOut;
 
-  // Build Shield to prevent Next.js 15 serialization errors
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
   return (
-    <AuthContext.Provider value={{ user, session, loading, profile, signOut, logout }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, profile, signOut, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -123,15 +132,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    return {
-      user: null,
-      session: null,
-      loading: true,
-      profile: null,
-      signOut: async () => {},
-      logout: async () => {}
-    };
+
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
   }
+
   return context;
 };
