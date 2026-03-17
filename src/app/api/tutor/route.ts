@@ -31,7 +31,7 @@ export async function POST(req: Request) {
         
         // BETTER: Define the persona here as a System Instruction
         const model = genAI.getGenerativeModel({ 
-          model: isPro ? "gemini-1.5-pro" : "gemini-1.5-flash",
+          model:   "gemini-2.5-flash",
           systemInstruction: "You are Aether Tutor, an expert academic assistant. Use LaTeX for math equations. Provide precise, structured, and helpful responses. If context is provided, prioritize it."
         });
 

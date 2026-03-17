@@ -1,82 +1,96 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const BASIC_KEYS = [
-  process.env.GEMINI_KEY_1,
-  process.env.GEMINI_KEY_2,
-  process.env.GEMINI_KEY_3,
-].filter(Boolean) as string[];
+type Tier = "free" | "pro";
 
-const PRO_KEYS = [
-  process.env.GEMINI_KEY_4,
-  process.env.GEMINI_KEY_5,
-].filter(Boolean) as string[];
+function getGeminiKeysByTier(tier: Tier): string[] {
+  if (tier === "pro") {
+    return [
+      process.env.GEMINI_KEY_4 || "",
+      process.env.GEMINI_KEY_5 || "",
+    ].filter(Boolean);
+  }
 
-const AETHER_SYSTEM_PROMPT = `
-You are Aether AI, an academic assistant.
-Respond in the same language as the user's question.
-Be clear, structured, and helpful.
-Use short headings and bullet points where useful.
-`;
+  return [
+    process.env.GEMINI_KEY_1 || "",
+    process.env.GEMINI_KEY_2 || "",
+    process.env.GEMINI_KEY_3 || "",
+  ].filter(Boolean);
+}
 
-export async function POST(req: Request) {
+async function generateWithGemini(apiKey: string, query: string) {
+  const genAI = new GoogleGenerativeAI(apiKey);
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+  });
+
+  const result = await model.generateContent(query);
+  const response = await result.response;
+  const text = response.text();
+
+  if (!text?.trim()) {
+    throw new Error("Empty response from Gemini.");
+  }
+
+  return text;
+}
+
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
-    const query = body?.query;
-    const context = body?.context || "";
+    const body = await request.json();
+    const query = body?.query?.trim();
     const isPro = Boolean(body?.isPro);
 
-    if (!query || typeof query !== "string") {
+    if (!query) {
       return NextResponse.json(
-        { error: "Query is required" },
+        { error: "Query is required." },
         { status: 400 }
       );
     }
 
-    const activeKeySet = isPro ? [...PRO_KEYS, ...BASIC_KEYS] : BASIC_KEYS;
+    const tier: Tier = isPro ? "pro" : "free";
+    const geminiKeys = getGeminiKeysByTier(tier);
 
-    if (!activeKeySet.length) {
+    if (geminiKeys.length === 0) {
       return NextResponse.json(
-        { error: "No AI API keys configured" },
+        { error: `No Gemini keys configured for ${tier} tier.` },
         { status: 500 }
       );
     }
 
-    let lastErrorMessage = "All AI nodes failed.";
+    const errors: string[] = [];
 
-    for (const key of activeKeySet) {
+    for (let index = 0; index < geminiKeys.length; index++) {
+      const apiKey = geminiKeys[index];
+
       try {
-        const genAI = new GoogleGenerativeAI(key);
+        const text = await generateWithGemini(apiKey, query);
 
-        const model = genAI.getGenerativeModel({
-          model: isPro ? "gemini-1.5-pro" : "gemini-1.5-flash",
-          systemInstruction: AETHER_SYSTEM_PROMPT,
+        return NextResponse.json({
+          text,
+          provider: "gemini",
+          model: "gemini-2.5-flash",
+          tier,
+          keyIndex: index + 1,
         });
-
-        const finalPrompt = context
-          ? `Context:\n${context}\n\nUser question:\n${query}`
-          : query;
-
-        const result = await model.generateContent(finalPrompt);
-        const response = await result.response;
-       const text = response.text() || "No response generated.";
-
-        return NextResponse.json({ text });
       } catch (error: unknown) {
-        if (error instanceof Error) {
-          lastErrorMessage = error.message;
-        }
-        continue;
+        const message =
+          error instanceof Error ? error.message : "Gemini request failed.";
+        errors.push(`Gemini key ${index + 1}: ${message}`);
       }
     }
 
     return NextResponse.json(
-      { error: lastErrorMessage },
-      { status: 503 }
+      {
+        error: `All Gemini keys failed for ${tier} tier.`,
+        details: errors,
+      },
+      { status: 500 }
     );
   } catch (error: unknown) {
     const message =
-      error instanceof Error ? error.message : "Internal server error";
+      error instanceof Error ? error.message : "Failed to generate response.";
 
     return NextResponse.json({ error: message }, { status: 500 });
   }

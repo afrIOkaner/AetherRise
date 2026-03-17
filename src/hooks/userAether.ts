@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/context/AuthContext';
-import { AETHER_CONFIG } from '@/lib/business-config';
-import { ChatMessage } from '@/lib/types';
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
+import { AETHER_CONFIG } from "@/lib/business-config";
+import { ChatMessage } from "@/lib/types";
 
 export const useAether = () => {
   const { user, profile } = useAuth();
@@ -12,40 +12,69 @@ export const useAether = () => {
   const sendMessage = async (text: string) => {
     if (!user || !profile) return;
 
-    // 1. Check Usage Limit (Point 1 & 26)
-    if (profile.tier === 'free' && profile.daily_usage_count >= AETHER_CONFIG.LIMITS.FREE_NOTES_PER_DAY) {
+    if (
+      profile.tier === "free" &&
+      (profile.daily_usage_count ?? 0) >=
+        AETHER_CONFIG.LIMITS.FREE_NOTES_PER_DAY
+    ) {
       alert("Daily limit reached! Please upgrade to Pro.");
       return;
     }
 
     setIsLoading(true);
-    const newUserMessage: ChatMessage = { role: 'user', content: text };
+
+    const newUserMessage: ChatMessage = {
+      role: "user",
+      content: text,
+    };
+
     setMessages((prev) => [...prev, newUserMessage]);
 
     try {
-      // 2. Call our Chat API (src/app/api/chat/route.ts)
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+        },
         body: JSON.stringify({
-          messages: [...messages, newUserMessage],
-          modelType: profile.tier === 'pro' ? 'gemini-1.5-pro' : 'gemini-1.5-flash',
+          query: text,
           university: profile.university,
-          department: profile.department
+          department: profile.department,
         }),
       });
 
       const data = await response.json();
 
-      if (data.text) {
-        const aiMessage: ChatMessage = { role: 'model', content: data.text };
-        setMessages((prev) => [...prev, aiMessage]);
-
-        // 3. Auto-Save to Database (Point 9)
-        await saveToVault(text, data.text);
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to get AI response.");
       }
+
+      if (!data?.text) {
+        throw new Error("Empty response from AI.");
+      }
+
+      const aiMessage: ChatMessage = {
+        role: "model",
+        content: data.text,
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+
+      await saveToVault(text, data.text);
     } catch (error) {
       console.error("Aether Engine Error:", error);
+
+      const errorMessage: ChatMessage = {
+        role: "model",
+        content: "Something went wrong. Please try again.",
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -54,22 +83,21 @@ export const useAether = () => {
   const saveToVault = async (topic: string, content: string) => {
     if (!user) return;
 
-    const wordCount = content.split(/\s+/).length;
+    const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
 
-    const { error } = await supabase.from('aether_notes').insert([
+    const { error } = await supabase.from("aether_notes").insert([
       {
         user_id: user.id,
         topic: topic.substring(0, 100),
-        content: content,
-        university: profile?.university || 'BRUR',
-        department: profile?.department || 'Statistics',
-        word_count: wordCount
-      }
+        content,
+        university: profile?.university || "BRUR",
+        department: profile?.department || "Statistics",
+        word_count: wordCount,
+      },
     ]);
 
     if (!error) {
-      // Update local usage count
-      await supabase.rpc('increment_usage', { user_id: user.id });
+      await supabase.rpc("increment_usage", { user_id: user.id });
     }
   };
 

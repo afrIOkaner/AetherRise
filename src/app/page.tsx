@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Loader2, Sparkles, LogOut, Cpu, Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
@@ -25,14 +26,18 @@ interface AetherResult {
 }
 
 export default function AetherHomePage() {
-  const { user, loading, signOut } = useAuth();
+  const router = useRouter();
+  const { user, loading, signOut, profile } = useAuth();
 
   const [prompt, setPrompt] = useState("");
+  const [email, setEmail] = useState("");
   const [result, setResult] = useState<AetherResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
 
@@ -77,17 +82,60 @@ export default function AetherHomePage() {
   };
 
   const handleLogout = async () => {
-    await signOut();
+    try {
+      setErrorMessage("");
+      await signOut();
+      router.replace("/");
+      router.refresh();
+    } catch {
+      setErrorMessage("Failed to sign out. Please try again.");
+    }
   };
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    setErrorMessage("");
+    setAuthMessage("");
+
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo:
           typeof window !== "undefined" ? window.location.origin : undefined,
       },
     });
+
+    if (error) {
+      setErrorMessage(error.message);
+    }
+  };
+
+  const handleEmailLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!email.trim()) {
+      setErrorMessage("Please enter your email address.");
+      return;
+    }
+
+    setIsEmailLoading(true);
+    setErrorMessage("");
+    setAuthMessage("");
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo:
+          typeof window !== "undefined" ? window.location.origin : undefined,
+      },
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+    } else {
+      setAuthMessage("Check your email for the magic login link.");
+    }
+
+    setIsEmailLoading(false);
   };
 
   const handleGenerate = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -109,14 +157,18 @@ export default function AetherHomePage() {
     setResult(null);
 
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({
           query: prompt.trim(),
-          isPro: false,
         }),
       });
 
@@ -132,7 +184,7 @@ export default function AetherHomePage() {
 
       setResult({
         content: data.text,
-        provider: "gemini",
+        provider: data.provider || "gemini",
         timestamp: new Date().toISOString(),
         github_url: null,
       });
@@ -184,7 +236,7 @@ export default function AetherHomePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="flex min-h-screen items-center justify-center bg-white">
         <Loader2 className="animate-spin text-blue-600" size={32} />
       </div>
     );
@@ -193,38 +245,69 @@ export default function AetherHomePage() {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f7f9fc] p-6">
-        <div className="w-full max-w-md rounded-[32px] border border-gray-100 bg-white p-8 text-center shadow-2xl shadow-blue-50">
-          <div className="mx-auto mb-6 inline-flex rounded-[24px] bg-blue-600 p-4 text-white shadow-lg shadow-blue-200">
-            <Cpu size={30} />
+        <div className="w-full max-w-md rounded-[32px] border border-gray-100 bg-white p-8 shadow-2xl shadow-blue-50">
+          <div className="text-center">
+            <div className="mx-auto mb-6 inline-flex rounded-[24px] bg-blue-600 p-4 text-white shadow-lg shadow-blue-200">
+              <Cpu size={30} />
+            </div>
+
+            <h1 className="mb-2 text-4xl font-black uppercase tracking-[0.12em] text-gray-900">
+              {AETHER_CONFIG?.BRAND?.NAME || "AETHERRISE"}
+            </h1>
+
+            <p className="mb-2 text-xs font-black uppercase tracking-[0.28em] text-blue-600">
+              The AI Research Engine
+            </p>
+
+            <p className="mb-8 text-sm leading-6 text-gray-500">
+              Built for engineers, statisticians, researchers, and deep thinkers.
+            </p>
           </div>
 
-          <h1 className="mb-2 text-4xl font-black uppercase tracking-tighter italic text-gray-900">
-            {AETHER_CONFIG?.BRAND?.NAME || "AETHERRISE"}
-          </h1>
-
-          <p className="mb-2 text-xs font-black uppercase tracking-[0.28em] text-blue-600">
-            AI Research Workspace
-          </p>
-
-          <p className="mb-8 text-sm leading-6 text-gray-500">
-            Built for students, researchers, and deep thinkers who want to turn
-            questions into structured knowledge.
-          </p>
-
-          <div className="space-y-3">
+          <div className="space-y-4">
             <button
               onClick={handleGoogleLogin}
-              className="w-full rounded-2xl bg-gray-900 px-6 py-4 text-sm font-black uppercase tracking-[0.18em] text-white transition hover:bg-black shadow-lg shadow-gray-200"
+              className="w-full rounded-2xl bg-gray-900 px-6 py-4 text-sm font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-gray-200 transition hover:bg-black"
             >
               Continue with Google
             </button>
 
-            <button
-              className="w-full rounded-2xl border border-gray-200 bg-white px-6 py-4 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
-              disabled
-            >
-              Email Login Coming Soon
-            </button>
+            <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+              <div className="h-px flex-1 bg-gray-200" />
+              <span>or</span>
+              <div className="h-px flex-1 bg-gray-200" />
+            </div>
+
+            <form onSubmit={handleEmailLogin} className="space-y-3">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="w-full rounded-2xl border border-gray-200 bg-white px-5 py-4 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                required
+              />
+
+              <button
+                type="submit"
+                disabled={isEmailLoading}
+                className="w-full rounded-2xl border border-gray-200 bg-white px-6 py-4 text-sm font-bold text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
+              >
+                {isEmailLoading ? "Sending Link..." : "Sign in with Email"}
+              </button>
+            </form>
+
+            {errorMessage && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                {errorMessage}
+              </div>
+            )}
+
+            {authMessage && (
+              <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
+                {authMessage}
+              </div>
+            )}
           </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">
@@ -250,7 +333,7 @@ export default function AetherHomePage() {
             <div className="rounded-xl bg-blue-600 p-2 text-white">
               <Cpu size={20} />
             </div>
-            <h1 className="text-lg font-black uppercase tracking-tighter italic text-gray-900">
+            <h1 className="text-lg font-black uppercase tracking-tighter text-gray-900">
               {AETHER_CONFIG?.BRAND?.NAME || "AETHERRISE"}
             </h1>
           </div>
@@ -285,6 +368,15 @@ export default function AetherHomePage() {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 pb-20 pt-10">
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-gray-900">
+            Welcome back, {profile?.full_name || "Researcher"}
+          </h2>
+          <p className="text-sm text-gray-500">
+            Continue your research journey.
+          </p>
+        </div>
+
         <div className="mb-8 rounded-[32px] border border-gray-100 bg-white p-3 shadow-2xl shadow-blue-50/50">
           <form onSubmit={handleGenerate} className="relative">
             <textarea
