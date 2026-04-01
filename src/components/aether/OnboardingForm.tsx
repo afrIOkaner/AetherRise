@@ -65,12 +65,13 @@ export default function OnboardingForm({ onSuccess }: OnboardingProps) {
       // Trigger transition in UI
       onSuccess();
       
-    } catch (err: any) {
-      console.error("[ONBOARDING_FAILURE]:", err.message);
-      alert("Registration failed. Please check your network or database schema.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (err: unknown) {
+  const errorMessage = err instanceof Error ? err.message : "Unknown error";
+  console.error("[ONBOARDING_FAILURE]:", errorMessage);
+  alert("Registration failed. Please check your network or database schema.");
+} finally {
+  setIsSubmitting(false);
+}
   };
 
   return (
