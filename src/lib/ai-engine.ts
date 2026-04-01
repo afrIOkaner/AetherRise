@@ -12,7 +12,9 @@ export interface EngineParams {
   department?: string;
   preferredLanguage?: "Bengali" | "English";
   syncToGithub?: boolean;
-  isPro?: boolean; // ✅ added
+  isPro?: boolean; 
+  image?: string | null;        
+  studentLevel?: string; 
 }
 
 export interface AIResult {

@@ -17,14 +17,11 @@ export async function POST(req: Request) {
   try {
     const { method, trx_id, amount } = await req.json();
 
-    // 1. Get User Authorization Header (Safe way to identify user)
-    const authHeader = req.headers.get('Authorization');
-    
     // Note: In a production environment, you should verify the JWT token here.
     // For now, we will focus on saving the data to the database.
 
     // 2. Insert Payment Request into Supabase 'payment_requests' table
-    const { data, error: dbError } = await supabase
+    const { error: dbError } = await supabase
       .from('payment_requests')
       .insert([
         {

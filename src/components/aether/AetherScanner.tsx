@@ -32,7 +32,7 @@ const AetherScanner: React.FC<ScannerProps> = ({ onScanSuccess, onClose }) => {
         onScanSuccess(decodedText);
         scanner.clear().catch(err => console.error("Scanner clear failed", err));
       },
-      (error) => {
+      () => {
         // Silent error logging for UX stability
       }
     );

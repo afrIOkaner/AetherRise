@@ -499,7 +499,7 @@ export default function AetherHomePage() {
       >
         <span className="text-xs sm:hidden">R</span>
         <span className="hidden sm:inline">
-          {isRepoLoading ? "Loading..." : "Load Repos"}
+          {isRepoLoading ? "Loading..." : "Load"}
         </span>
       </button>
 
@@ -554,7 +554,7 @@ export default function AetherHomePage() {
               disabled={!selectedRepo || isRepoLoading}
               className="rounded-xl bg-blue-600 px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-blue-700 disabled:opacity-50"
             >
-              Save Repo
+              Save Repository
             </button>
           </div>
 

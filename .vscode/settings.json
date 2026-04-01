@@ -8,9 +8,11 @@
         "groq",
         "katex",
         "Ollama",
+        "qrbox",
         "qrcode",
         "Rangpur",
         "Rokeya",
+        "sess",
         "SUPABASE",
         "Zotero"
     ]

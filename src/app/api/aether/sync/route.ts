@@ -89,7 +89,7 @@ export async function POST(request: Request) {
       sessionID: sessionID || `sess_${Date.now()}`,
       syncToGithub,
       preferredLanguage
-    }as any);
+    });
 
     // 5. Analytics Metadata
     const wordCount = aiResponse.content?.trim().split(/\s+/).length || 0;
@@ -136,13 +136,14 @@ export async function POST(request: Request) {
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[AETHER_ENGINE_CRITICAL]:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
       { 
         status: "Critical Failure", 
         message: "Aether Engine encountered an internal orchestration error.",
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
       }, 
       { status: 500 }
     );

@@ -27,7 +27,7 @@ export const formatLatexOutput = (text: string): string => {
   if (!text) return "";
   
   // Logic: Normalize \( ... \) to $...$ and \[ ... \] to $$...$$
-  let formatted = text
+  const formatted = text
     .replace(/\\\[/g, '$$$$') // Convert \[ to $$
     .replace(/\\\]/g, '$$$$') // Convert \] to $$
     .replace(/\\\(/g, '$')     // Convert \( to $
@@ -49,7 +49,7 @@ export const sanitizeResponse = (text: string): string => {
 /**
  * Extracts clean JSON if the AI wraps it in markdown code blocks.
  */
-export const extractJSON = (raw: string): any => {
+export const extractJSON = (raw: string): Record<string, unknown> | unknown[] | null => {
   try {
     const jsonMatch = raw.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
     return jsonMatch ? JSON.parse(jsonMatch[0]) : null;

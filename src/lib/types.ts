@@ -20,7 +20,7 @@ export interface AetherNote {
   user_id: string;
   topic: string;
   content: string;
-  raw_response?: any;
+  raw_response?: Record<string, unknown>;
   university: string;
   department: string;
   word_count: number;
