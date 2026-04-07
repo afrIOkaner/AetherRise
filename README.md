@@ -4,9 +4,10 @@
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
 ![React](https://img.shields.io/badge/React-19-61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E)
 
-**AetherRise** is a professional-grade AI-native research ecosystem designed for scholars, developers, and students. It bridges the gap between raw data collection and structured academic insight by treating research notes like version-controlled code.
+**AetherRise** is a production-grade AI-native research ecosystem designed for scholars, developers, and students. It bridges the gap between raw data collection and structured academic insight — treating research notes like version-controlled code.
 
 🔗 **Live Demo:** https://aether-rise.vercel.app
 
@@ -44,12 +45,14 @@ Every insight generated can be automatically pushed to a dedicated GitHub reposi
 | AI | Google Gemini AI |
 | PWA | Serwist (Service Workers) |
 | GitHub API | Octokit |
+| CI/CD | GitHub Actions |
 
 ---
 
 ## 🛠 Installation & Setup
 
 ### 1. Clone & Install
+
 ```bash
 git clone https://github.com/Priom-Das/AetherRise.git
 cd AetherRise
@@ -57,7 +60,9 @@ npm install
 ```
 
 ### 2. Environment Variables
+
 Create a `.env.local` file in the root:
+
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -65,6 +70,7 @@ GITHUB_PAT=your_github_personal_access_token
 ```
 
 ### 3. Run Development Server
+
 ```bash
 npm run dev
 ```
@@ -92,6 +98,21 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ## 🤝 Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before submitting a PR.
+
+```
+git checkout -b feature/your-feature-name
+git commit -m "feat: describe your change"
+git push origin feature/your-feature-name
+```
+
+---
+
+## 👨‍💻 Author
+
+**Priom Chandra Das**
+- 🌐 Portfolio: [priom-das.github.io](https://priom-das.github.io)
+- 💼 LinkedIn: [priom-das-731958241](https://www.linkedin.com/in/priom-das-731958241/)
+- 🐦 Twitter: [@PriomDas57](https://x.com/PriomDas57)
 
 ---
 
