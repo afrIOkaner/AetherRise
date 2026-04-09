@@ -614,6 +614,7 @@ export default function AetherHomePage() {
                 provider={result.provider}
                 timestamp={result.timestamp}
                 githubUrl={result.github_url}
+                topic={prompt}
               />
 
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3">

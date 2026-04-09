@@ -5,6 +5,7 @@
         "autoregressive",
         "beforeinstallprompt",
         "BRUR",
+        "capitalised",
         "groq",
         "katex",
         "Ollama",
